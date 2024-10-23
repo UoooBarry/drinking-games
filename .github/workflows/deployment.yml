@@ -17,7 +17,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v4s
 
     - name: SSH and Deploy
       env:
@@ -36,7 +36,7 @@ jobs:
           cd /var/www/$REPOSITORY_NAME
           git pull
           pnpm install
-          pnpm build
+          pnpm vite build
           echo $DEPLOY_USER_PASSWORD | sudo -S nginx -t
           echo $DEPLOY_USER_PASSWORD | sudo -S systemctl reload nginx
         EOF
