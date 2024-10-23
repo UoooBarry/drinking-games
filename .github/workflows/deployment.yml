@@ -1,0 +1,42 @@
+name: Deploy to Server
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: SSH and Deploy
+      env:
+        DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER }}
+        DEPLOY_USER_PASSWORD: ${{ secrets.DEPLOY_USER_PASSWORD }}
+        DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        REPOSITORY_NAME: ${{ secrets.REPOSITORY_NAME }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $DEPLOY_SERVER >> ~/.ssh/known_hosts
+
+        ssh -i ~/.ssh/id_rsa $DEPLOY_USER@$DEPLOY_SERVER << 'EOF'
+          cd /var/www/$REPOSITORY_NAME
+          git pull
+          pnpm install
+          pnpm build
+          sudo nginx -t
+          echo $DEPLOY_USER_PASSWORD | sudo -S systemctl reload nginx
+        EOF
