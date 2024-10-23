@@ -1,20 +1,12 @@
 <template>
-  <div ref="container">
-    <h1>Toucher</h1>
+  <div ref="container" class="user-select-none touch-area">
     <div
-      class="fixed inset-0 flex items-center justify-center bg-black dark:bg-gray-900"
-      @mousedown="handlePressStart"
+      class="fixed inset-0 flex items-center justify-center bg-black dark:bg-gray-900 user-select-none"
+      @mousedown.prevent="handlePressStart"
       @mouseup="handlePressEnd"
-      @mouseleave="handlePressEnd"
-      @touchstart="handlePressStart"
-      @touchend="handlePressEnd"
+      @touchstart.prevent="handleTouch"
+      @touchend="handleTouch"
     >
-      <button
-        class="bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 border-2 border-gray-900 dark:border-gray-100 text-vertical writing-mode-vertical-lr hover:bg-gray-300 dark:hover:bg-gray-700"
-        @click="handleButtonPress"
-      >
-        Touch Me
-      </button>
       <div
         v-for="(ripple, index) in ripples"
         :key="index"
@@ -24,19 +16,43 @@
           backgroundColor: ripple.color,
         }"
         class="absolute rounded-full opacity-50"
-        :class="isCounting ? 'ripple-effect' : 'ripple-no-effect'"
+        :class="{
+          'ripple-effect': stage === 'counting',
+          'ripple-no-effect': stage !== 'counting',
+          'scale-up': ripple.selected,
+        }"
       ></div>
     </div>
+    <button
+      v-if="stage === 'init'"
+      class="absolute bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 border-2 border-gray-900 dark:border-gray-100 text-vertical writing-mode-vertical-lr hover:bg-gray-300 dark:hover:bg-gray-700 h-40 w-16"
+      style="top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10;"
+      @click="handleButtonPress"
+      @touchend="handleButtonPress"
+      @touchstart.stop.prevent
+    >
+      Touch Me
+    </button>
+    <button
+      v-if="stage === 'pause'"
+      class="absolute bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white p-4 border-2 border-gray-900 dark:border-gray-100 text-vertical writing-mode-vertical-lr hover:bg-gray-300 dark:hover:bg-gray-700 h-40 w-16"
+      style="top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10;"
+      @click="resetGame"
+    >
+      Reset
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
 
-const ripples = ref<{ id: number; x: number; y: number; color: string }[]>([]);
+const ripples = ref<
+  { id: number; x: number; y: number; color: string; selected?: boolean }[]
+>([]);
 const currentRippleId = ref<number | null>(null); // 记录当前按住的光圈ID
 const container = ref<HTMLElement | null>(null);
-const isCounting = ref(false);
+const stage = ref<"init" | "counting" | "beforeReset" | "pause">("init");
 
 const getRandomColor = () => {
   const colors = [
@@ -82,6 +98,30 @@ const handlePressStart = (event: MouseEvent | TouchEvent) => {
   currentRippleId.value = newRippleId;
 };
 
+const handleTouch = (event: TouchEvent) => {
+  if (stage.value === "init") {
+    ripples.value = Array.from(event.touches).map((touch) => {
+      const newRippleId = generateRippleId();
+      const color = getRandomColor();
+      return {
+        id: newRippleId,
+        x: touch.clientX,
+        y: touch.clientY,
+        color,
+      };
+    });
+  }
+  if (stage.value === "beforeReset" || stage.value === "counting") {
+    stage.value = "pause";
+  }
+};
+
+const resetGame = () => {
+  currentRippleId.value = null;
+  ripples.value = [];
+  stage.value = "init";
+};
+
 const handlePressEnd = () => {
   if (currentRippleId.value !== null) {
     ripples.value = ripples.value.filter(
@@ -89,12 +129,18 @@ const handlePressEnd = () => {
     );
     currentRippleId.value = null; // 重置当前ID
   }
+  if (stage.value === "beforeReset") {
+    stage.value = "pause";
+  }
 };
 
 // 悬浮按钮按下时，随机选中一个光圈
 const handleButtonPress = () => {
-  isCounting.value = true;
-  if (ripples.value.length === 0) return;
+  stage.value = "counting";
+  if (ripples.value.length === 0) {
+    stage.value = "init";
+    return;
+  }
 
   // 随机选取一个光圈
   const randomIndex = Math.floor(Math.random() * ripples.value.length);
@@ -103,16 +149,13 @@ const handleButtonPress = () => {
   // 开始倒计时5秒
   setTimeout(() => {
     // 保留被选中的光圈，清除其他的光圈
+    selectedRipple.selected = true;
     ripples.value = ripples.value.filter(
       (ripple) => ripple.id === selectedRipple.id,
     );
-    isCounting.value = false;
-  }, 5000); // 5秒后执行
+    stage.value = "beforeReset";
+  }, 5000);
 };
-
-setTimeout(() => {
-  handleButtonPress();
-}, 5000);
 </script>
 
 <style scoped>
@@ -161,5 +204,48 @@ setTimeout(() => {
   height: 100px;
   border-radius: 50%;
   opacity: 0.7;
+}
+
+.user-select-none {
+  user-select: none;
+  -webkit-user-select: none; /* Chrome, Safari, Opera */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* Internet Explorer/Edge */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+* {
+  -webkit-touch-callout: none;
+
+  /* iOS Safari */
+  -webkit-user-select: none;
+
+  /* Safari */
+  -khtml-user-select: none;
+
+  /* Konqueror HTML */
+  -moz-user-select: none;
+
+  /* Firefox */
+  -ms-user-select: none;
+
+  /* Internet Explorer/Edge */
+  user-select: none;
+
+  /* Non-prefixed version, currently supported by Chrome and Opera */
+}
+.scale-up {
+  width: 200px;
+  height: 200px;
+}
+
+.touch-area {
+  touch-action: none;
 }
 </style>
