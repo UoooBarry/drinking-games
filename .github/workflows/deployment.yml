@@ -32,11 +32,11 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H $DEPLOY_SERVER >> ~/.ssh/known_hosts
 
-        ssh -i ~/.ssh/id_rsa $DEPLOY_USER@$DEPLOY_SERVER << 'EOF'
+        ssh -i ~/.ssh/id_rsa $DEPLOY_USER@$DEPLOY_SERVER << EOF
           cd /var/www/$REPOSITORY_NAME
           git pull
           pnpm install
           pnpm build
-          sudo nginx -t
+          echo $DEPLOY_USER_PASSWORD | sudo -S nginx -t
           echo $DEPLOY_USER_PASSWORD | sudo -S systemctl reload nginx
         EOF
